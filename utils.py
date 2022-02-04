@@ -2,7 +2,6 @@ import os
 import glob 
 import shutil
 import copy
-import math
 
 import tqdm
 import numpy as np
@@ -108,7 +107,7 @@ def to_image(
     return img
 
 
-def sample_sphere(n=100, center=(0, 0, 0), minr=0, maxr=1, mintheta=0, maxtheta=2*math.pi, minphi=0, maxphi=1):
+def sample_sphere(n=100, center=(0, 0, 0), minr=0, maxr=1, mintheta=0, maxtheta=2*np.pi, minphi=0, maxphi=1):
     """Function to Sample points Between Two concentric Spheres using Inverse Transform Samples
        Reference: https://github.com/girishdhegde/random.fun/tree/master/sampling
                   http://corysimon.github.io/articles/uniformdistn-on-sphere/
