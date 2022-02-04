@@ -26,7 +26,7 @@ def maximal_simplex(points):
     
     Returns:
         (np.ndarray, bool): [4, 3] - tetrahadron, nondegenerate
-    """    
+    """
     for dim in range(3):
         imin, imax = np.argmin(points[:, dim]), np.argmax(points[:, dim])
         if points[imin, dim] != points[imax, dim]:
@@ -57,6 +57,18 @@ def maximal_simplex(points):
         tetrahedron = np.array([v0, v1, v2, v3])
 
     return tetrahedron, True
+
+
+def quickhull(points):
+    """ Function to find 3D convex hull.
+
+    Args:
+        points (np.ndarray): [N, 3] - xyz coordinates.
+    
+    Returns:
+        (np.ndarray, np.ndarray): [M, 3] - polyhedron vertices, [L, 3] - faces
+    """
+    simplex, nondegenerate = maximal_simplex(points)
 
 
 def main():
