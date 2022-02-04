@@ -2,6 +2,7 @@ import os
 import glob 
 import shutil
 import copy
+import math
 
 import tqdm
 import numpy as np
@@ -105,3 +106,55 @@ def to_image(
         cv2.waitKey(delay)
         cv2.destroyAllWindows()
     return img
+
+
+def sample_sphere(n=100, center=(0, 0, 0), minr=0, maxr=1, mintheta=0, maxtheta=2*math.pi, minphi=0, maxphi=1):
+    """Function to Sample points Between Two concentric Spheres using Inverse Transform Samples
+       Reference: https://github.com/girishdhegde/random.fun/tree/master/sampling
+                  http://corysimon.github.io/articles/uniformdistn-on-sphere/
+
+    polar coords -> (r, theta, phi)
+    theta = uniform[0, 2.pi)
+    phi = arccos(1 - 2.uniform[0, 1))
+    r = cbrt(uniform(0, 1)) <- inverse transform
+    
+    cartesian
+    x = r.cos(theta).sin(phi)
+    y = r.sin(theta).sin(phi)
+    z = r.cos(phi)
+
+    Args:
+        n (int, optional): number of points. Defaults to 100.
+        minr (float, optional): radius of inner sphere
+        maxr (float, optional): radius of outer sphere
+        mintheta (float, optional): minimum angle wrt x. Defaults to 0
+        maxtheta (float, optional): maximum angle wrt x. Defaults to 2pi
+        minphi (float, optional): minimum angle wrt z. Defaults to 0
+        maxphi (float, optional): maximum angle wrt z. Defaults to 1
+    """
+
+    ranger = (maxr - minr)
+    ranget = (maxtheta - mintheta)
+    rangep = (maxphi - minphi)
+
+    theta = mintheta + np.random.random(n)*ranget
+    phi = np.arccos(1 - 2*(minphi + np.random.random(n)*rangep))
+    radius = np.random.random(n)**(1/3)
+    
+    radius = minr + radius*ranger
+    # theta = mintheta + radius*ranget
+    # phi = minphi + radius*rangep
+    
+    x = radius*np.cos(theta)*np.sin(phi)
+    y = radius*np.sin(theta)*np.sin(phi)
+    z = radius*np.cos(phi)
+
+    cx, cy, cz = center
+    x, y, z = x + cx, y + cy, z + cz
+
+    return np.vstack([x, y, z]).T
+
+
+if __name__ == "__main__":
+    points = sample_sphere(100, minr=0.6, maxr=1.0)
+    to_pcd(points, [0, 0, 1], viz=True, )
