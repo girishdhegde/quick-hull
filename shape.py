@@ -47,6 +47,9 @@ class Polygon:
             edges = [[i, i + 1] for i in range(self.nvertices - 1)]
             edges.append([self.nvertices - 1, 0])
         self.edges = edges
+        self.edge_vectors = []
+        for (start, end) in self.edges:
+            self.edge_vectors.append(self.vertices[end] - self.vertices[start])
     
     def distance(self, points):
         """ Function to calculate distance of points from plane
@@ -61,6 +64,66 @@ class Polygon:
         dp = np.dot(p_p0, self.normal)
         dist = np.abs(dp)
         return dp, dist
+    
+    def common_edge(self, other):
+        """ Function to find common edge and uncommon vertex
+
+        Args:
+            other (Polygon): adjacent polygon face.
+        
+        Returns:
+            [np.ndarray, np.ndarray]: [(xn, yn, zn), (xm, ym, zm)]  - common edge
+            (np.ndarray): (x, y, z) - uncommon vertex
+        """
+        for i, pt in enumerate(other.vertices):
+            for v in self.vertices:
+                if (pt == v).all():
+                    break
+            else:
+                break
+        return [v for iv, v in enumerate(other.vertices) if i != iv], pt
+
+    def inside(self, point):
+        """ Function to check if point inside polygon
+
+        Args:
+            point (np.ndarray): [x, y, z] - point
+        Returns:
+            if inside:
+                (np.ndarray): [x, y, z] - point
+            else:
+                None
+        """
+        for (start, end), edge in zip(self.edges, self.edge_vectors):
+            c = point - self.vertices[start]
+            if np.dot(self.normal, np.cross(edge, c)) < 0:
+                return None
+        return point
+
+    def intersect(self, origin, direction):
+        """ Function to check ray(origin, direction) intersection
+
+        Args:
+            origin (np.ndarray): [x, y, z] - ray origin.
+            direction (np.ndarray): [x_, y_, z_] - ray unit direction.
+        Returns:
+            if intersects:
+                (np.ndarray): [x, y, z] - point of intersection.
+            else:
+                None
+        """
+        denom = self.normal.dot(direction)
+        # normals are opposite in direction
+        x = None
+        if denom < -1e-6:
+            t = ((self.vertices[0] - origin).dot(self.normal))/denom
+            x = origin + t*direction
+        if denom > 1e-6:
+            t = ((self.vertices[0] - origin).dot(self.normal))/denom
+            x =  origin + t*direction
+        if x is not None:
+            return self.inside(x)
+        return None
 
 
 def ray_x_plane(origin, direction, vertex, normal):

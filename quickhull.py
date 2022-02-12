@@ -75,6 +75,9 @@ def quickhull(points):
     """
     simplex, nondegenerate = maximal_simplex(points)
     if nondegenerate:
+        tetra = LineMesh(simplex, [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], colors=[1, 0, 0], radius=0.01).cylinder_set
+
+        # Assign outside points to faces
         v0, v1, v2, v3 = simplex
         faces = [Polygon(v2, v1, v0, ), Polygon(v0, v1, v3), Polygon(v1, v2, v3), Polygon(v2, v0, v3), ]
         
@@ -84,13 +87,13 @@ def quickhull(points):
         below, inside = points_above_planes(points, vertices, normals)
         above, outside = np.logical_not(below), np.logical_not(inside)
 
-        tetra = LineMesh(simplex, [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], colors=[1, 0, 0], radius=0.01).cylinder_set
         indices = above&outside[:, None]
         mask = np.logical_not(indices[:, 0])
         nfaces = len(faces)
         temp = []
         print('total points, inside point, outside points:', points.shape[0], inside.sum(), outside.sum())
         for i in range(nfaces):
+            faces[i].neighbours = [faces[nbr] for nbr in range(nfaces) if nbr != i]
             above_pts = points[indices[:, i]]
             faces[i].points = above_pts
             if i < (nfaces - 1):
@@ -104,14 +107,36 @@ def quickhull(points):
         faces = temp
 
         while faces:
+            # Find most distant point to face
             face = faces.pop()
             if not len(face.points): continue
             dp, distances = face.distance(face.points)
             farthest_idx = np.argmax(distances)
             farthest = face.points[farthest_idx]
             # # Visualization
-            # fpt = to_pcd([farthest], [0, 0, 1], viz=False)
+            # fpt = to_pcd([farthest], [1, 0.5, 0], viz=False, )
+            # tri = LineMesh(face.vertices, face.edges, colors=[1, 0, 0], radius=0.01).cylinder_set
             # o3d.visualization.draw_geometries([fpt, tetra])
+
+            # Find all faces that can be seen from that point
+            light_faces = []
+            for nbr in face.neighbours:
+                edge, uc_vtx = face.common_edge(nbr)
+                direction = uc_vtx - farthest
+                direction = direction / np.linalg.norm(direction)
+                x = face.intersect(farthest, direction)
+                if x is None:  # if visible
+                    light_faces.append(nbr)
+                    xpt = fpt
+                else:
+                    xpt = to_pcd([x], [0, 0, 0], viz=False, )
+                # Visualization
+                # upt = to_pcd([uc_vtx], [0, 0, 1], viz=False, )
+                # o3d.visualization.draw_geometries([fpt, upt, xpt, tri])
+            print('light faces:', light_faces)
+
+
+
 
 
         # # Points visualization
