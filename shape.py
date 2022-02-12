@@ -47,6 +47,20 @@ class Polygon:
             edges = [[i, i + 1] for i in range(self.nvertices - 1)]
             edges.append([self.nvertices - 1, 0])
         self.edges = edges
+    
+    def distance(self, points):
+        """ Function to calculate distance of points from plane
+
+        Args:
+            points (np.ndarray): [N, 3] - array of xyz points.
+        Returns:
+            (np.ndarray) - [N, ] dot products(signed distances).
+            (np.ndarray) - [N, ] absolute disances.
+        """
+        p_p0 = points - self.vertices[0]
+        dp = np.dot(p_p0, self.normal)
+        dist = np.abs(dp)
+        return dp, dist
 
 
 def ray_x_plane(origin, direction, vertex, normal):

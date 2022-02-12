@@ -74,50 +74,63 @@ def quickhull(points):
         (np.ndarray, np.ndarray): [M, 3] - polyhedron vertices, [L, 3] - faces
     """
     simplex, nondegenerate = maximal_simplex(points)
-    v0, v1, v2, v3 = simplex
-    faces = [Polygon(v2, v1, v0, ), Polygon(v0, v1, v3), Polygon(v1, v2, v3), Polygon(v2, v0, v3), ]
-    
-    vertices = np.array([face.vertices[0] for face in faces])
-    normals = np.array([face.normal for face in faces])
-
-    below, inside = points_above_planes(points, vertices, normals)
-    above, outside = np.logical_not(below), np.logical_not(inside)
-
-    tetra = LineMesh(simplex, [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], colors=[1, 0, 0], radius=0.01).cylinder_set
-    indices = above&outside[:, None]
-    mask = np.logical_not(indices[:, 0])
-    nfaces = len(faces)
-    print('total points, inside point, outside points:', points.shape[0], inside.sum(), outside.sum())
-    for i in range(nfaces):
-        faces[i].points = points[indices[:, i]]
-        if i < (nfaces - 1):
-            indices[:, i + 1] = indices[:, i + 1]&mask
-            mask = mask&np.logical_not(indices[:, i])
-
-        pcd = to_pcd(faces[i].points, [1, 0.5, 0], viz=False, )
-        o3d.visualization.draw_geometries([pcd, tetra])
-    exit()
-
     if nondegenerate:
-        # Points visualization
-        inside_pcd = to_pcd(points[inside], [1, 0.5, 0], viz=False, )
-        outside_pcd = to_pcd(points[np.logical_not(inside)], [0, 0, 1], viz=False, )
-        pcd = inside_pcd + outside_pcd
-        # pcd = inside_pcd
-        # Faces visualization
-        tetra = LineMesh(simplex, [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], colors=[1, 0, 0], radius=0.01).cylinder_set
-        # Normals visualization
-        npoints = [] 
-        nedges = []
-        for i, face in enumerate(faces):
-            normal_start = face.vertices[0]
-            normal_end = normal_start + face.normal
-            npoints.append(normal_start)
-            npoints.append(normal_end)
-            nedges.append([2*i, 2*i + 1])
-        nmesh = LineMesh(npoints, nedges, colors=[0, 1, 0], radius=0.01).cylinder_set
+        v0, v1, v2, v3 = simplex
+        faces = [Polygon(v2, v1, v0, ), Polygon(v0, v1, v3), Polygon(v1, v2, v3), Polygon(v2, v0, v3), ]
         
-        o3d.visualization.draw_geometries([pcd, tetra, nmesh])
+        vertices = np.array([face.vertices[0] for face in faces])
+        normals = np.array([face.normal for face in faces])
+
+        below, inside = points_above_planes(points, vertices, normals)
+        above, outside = np.logical_not(below), np.logical_not(inside)
+
+        tetra = LineMesh(simplex, [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], colors=[1, 0, 0], radius=0.01).cylinder_set
+        indices = above&outside[:, None]
+        mask = np.logical_not(indices[:, 0])
+        nfaces = len(faces)
+        temp = []
+        print('total points, inside point, outside points:', points.shape[0], inside.sum(), outside.sum())
+        for i in range(nfaces):
+            above_pts = points[indices[:, i]]
+            faces[i].points = above_pts
+            if i < (nfaces - 1):
+                indices[:, i + 1] = indices[:, i + 1]&mask
+                mask = mask&np.logical_not(indices[:, i])
+            if len(above_pts):
+                temp.append(faces[i])
+            # # Visualization
+            # pcd = to_pcd(faces[i].points, [1, 0.5, 0], viz=False, )
+            # o3d.visualization.draw_geometries([pcd, tetra])
+        faces = temp
+
+        while faces:
+            face = faces.pop()
+            if not len(face.points): continue
+            dp, distances = face.distance(face.points)
+            farthest_idx = np.argmax(distances)
+            farthest = face.points[farthest_idx]
+            # # Visualization
+            # fpt = to_pcd([farthest], [0, 0, 1], viz=False)
+            # o3d.visualization.draw_geometries([fpt, tetra])
+
+
+        # # Points visualization
+        # inside_pcd = to_pcd(points[inside], [1, 0.5, 0], viz=False, )
+        # outside_pcd = to_pcd(points[np.logical_not(inside)], [0, 0, 1], viz=False, )
+        # pcd = inside_pcd + outside_pcd
+        # # pcd = inside_pcd
+        # # Normals visualization
+        # npoints = [] 
+        # nedges = []
+        # for i, face in enumerate(faces):
+        #     normal_start = face.vertices[0]
+        #     normal_end = normal_start + face.normal
+        #     npoints.append(normal_start)
+        #     npoints.append(normal_end)
+        #     nedges.append([2*i, 2*i + 1])
+        # nmesh = LineMesh(npoints, nedges, colors=[0, 1, 0], radius=0.01).cylinder_set
+        
+        # o3d.visualization.draw_geometries([pcd, tetra, nmesh])
 
 
 if __name__ == '__main__':
