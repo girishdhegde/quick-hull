@@ -4,6 +4,28 @@ import numpy as np
 __author__ = "__Girish_Hegde__"
 
 
+def points_above_planes(points, vertices, normals, ):
+    """ Function to check if points are above/below given planes.
+        It can be used for checking points inside/outside polyhedron.
+        author = "Girish D Hegde'
+        contact = "girish.dhc@gmail.com"
+
+    Args:
+        points (np.ndarray): [N, 3] - matrix of points.
+        vertices (np.ndarray): [M, 3] - matrix of point on faces.
+        normals (np.ndarray): [M, 3] matrix of normal of faces.
+    Returns:
+        (np.ndarray, np.ndarray) - [N, M] - above planes bools, [N, ] - inside points bools.
+    """
+    
+    point_vectors = vertices[None, :, :] - points[:, None, :]
+    distances = np.einsum('ijk, jk -> ij', point_vectors, normals)
+    sign = distances > 0 
+    signsum = np.sum(sign, axis=1)
+    inside = (signsum == 0)|(signsum == len(normals))
+    return sign, inside
+
+
 class Polygon:
     def __init__(self, *vertices, normal=None, edges=None):
         """ Polygon
