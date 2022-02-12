@@ -113,29 +113,37 @@ def quickhull(points):
             dp, distances = face.distance(face.points)
             farthest_idx = np.argmax(distances)
             farthest = face.points[farthest_idx]
-            # # Visualization
-            # fpt = to_pcd([farthest], [1, 0.5, 0], viz=False, )
-            # tri = LineMesh(face.vertices, face.edges, colors=[1, 0, 0], radius=0.01).cylinder_set
-            # o3d.visualization.draw_geometries([fpt, tetra])
 
             # Find all faces that can be seen from that point
-            light_faces = []
+            light_faces = [face]
             for nbr in face.neighbours:
                 edge, uc_vtx = face.common_edge(nbr)
-                direction = uc_vtx - farthest
-                direction = direction / np.linalg.norm(direction)
-                x = face.intersect(farthest, direction)
-                if x is None:  # if visible
+                dp, dist = nbr.distance(farthest)
+                if dp > 0:
                     light_faces.append(nbr)
-                    xpt = fpt
-                else:
-                    xpt = to_pcd([x], [0, 0, 0], viz=False, )
-                # Visualization
-                # upt = to_pcd([uc_vtx], [0, 0, 1], viz=False, )
-                # o3d.visualization.draw_geometries([fpt, upt, xpt, tri])
-            print('light faces:', light_faces)
 
 
+
+
+
+
+        # direction = uc_vtx - farthest
+        # direction = direction / np.linalg.norm(direction)
+        # x = face.intersect(farthest, direction)
+        # if x is None:  # if visible
+        #     light_faces.append(nbr)
+        # #     xpt = fpt
+        # else:
+        #     xpt = to_pcd([x], [0, 0, 0], viz=False, )
+        # Visualization
+        # upt = to_pcd([uc_vtx], [0, 0, 1], viz=False, )
+        # o3d.visualization.draw_geometries([fpt, upt, xpt, tri])
+    # print('light faces:', light_faces)
+    # if len(light_faces) > 1:
+    #     print("Sorry this case not handled")
+    #     fpt = to_pcd([farthest], [1, 0.5, 0], viz=False, )
+    #     tetra = LineMesh(simplex, [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], colors=[1, 0, 0], radius=0.01).cylinder_set
+    #     o3d.visualization.draw_geometries([fpt, tetra])
 
 
 
