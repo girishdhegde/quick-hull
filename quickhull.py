@@ -132,6 +132,40 @@ def insert_edge(edge,  edges=None):
     return edges
 
 
+def delete_face(faces, edges, index=None, face=None):
+    """ Fuction to delete face.
+
+    Args:
+        faces (list[Face]): list of faces.
+        edges (list[HalfEdge]): list of edges.
+        index (int, optional): delete faces[index]. Defaults to None.
+        face (Face, optional): delete face. Defaults to None.
+
+    Returns:
+        list[Face]: list of faces.
+        list[HalfEdge]: list of edges.
+    """
+    index = -1 if (face is None) and (index is None) else index
+    if index is None:
+        for i, other in enumerate(faces):
+            if other == face:
+                index = i
+                break
+    face = faces.pop(index)
+    e1 = face.edge
+    e0, e2 = e1.prev, e1.next
+    delids = []
+    for edge in [e0, e1, e2]:
+        edge.twin.twin = None
+        for i, other in enumerate(edges):
+            if edge == other:
+                delids.apppend(i)
+    delids = [idx - i for i, idx in enumerate(delids.sort())]
+    for idx in delids:
+        edges.pop(idx)
+    return faces, edges
+
+
 def init_edges_faces(simplex):
     """ Initialization function
 
@@ -209,9 +243,6 @@ def quickhull(points):
     #     pcd = to_pcd(face.points, [0, 0, 1], viz=False, )
     #     o3d.visualization.draw_geometries([pcd, tetra])
 
-    exit()
-
-
     while faces:
         # Find most distant point to face
         face = faces.pop()
@@ -229,6 +260,7 @@ def quickhull(points):
             if dp > 0:
                 light_faces.append(nbr)
                 nbr.on_hull = False
+    exit()
 
 
 
