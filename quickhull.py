@@ -123,9 +123,42 @@ def horizon(eye, face, edges=None):
 
     # DFS
     for edge in face_edges:
-        edges = horizon(eye, edge.twin.face, edges)
+        if edge.twin is not None:
+            edges = horizon(eye, edge.twin.face, edges)
 
     return edges
+
+
+def triangulate(eye, edges):
+    """ Function to triangulate eye and horizon edges
+
+    Args:
+        eye (np.ndarray): [x, y, z] - point
+        edges (list[EdgeHalf]): horizon edges.
+
+    Returns:
+        list[Face]: list of triangle faces.
+        list[HalfEdge]: list of edges.
+    """
+
+    face_edges, faces = [], []
+    nedges = len(edges) - 1
+    for i, edge in enumerate(edges):
+        frm = HalfEdge(eye, None, nxt=edge)
+        if i == nedges:
+            to = HalfEdge(edges[0].tail, None, prev=edge, nxt=frm)
+        else:
+            to = HalfEdge(edges[i + 1].tail, None, prev=edge, nxt=frm)
+        frm.prev = to
+        edge.prev = frm
+        edge.next = to
+
+        face = Face(frm)
+
+        face_edges += [frm, edge, to]
+        faces.append(face)
+
+    return faces, face_edges
 
 
 def triangle2edges(v0, v1, v2):
@@ -297,8 +330,12 @@ def quickhull(points):
         eye = face.points[idx]
 
         horizons = horizon(eye, face)
-        print(horizons)
 
+        new_faces, new_edges = triangulate(eye, horizons)
+        edges = insert_edge(new_edges, edges)
+
+        new_mesh = faces2mesh(new_faces, clr=(0, 0, 1), radius=0.01)
+        o3d.visualization.draw_geometries([new_mesh, tetra])
         exit()
 
 
