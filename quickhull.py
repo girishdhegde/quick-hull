@@ -98,6 +98,76 @@ def edge_lookup(faces, edges=None, edge_faces=None):
     return edges, edge_faces
 
 
+def triangle2edges(v0, v1, v2):
+    """ Function to convert triangle vertices to half-edges
+
+    Args:
+        v0 (np.ndarray): [x, y, z] - vertex.
+        v1 (np.ndarray): [x, y, z] - vertex.
+        v2 (np.ndarray): [x, y, z] - vertex.
+    """
+    e0 = HalfEdge(v0, face=None, prev=None, nxt=None, twin=None)
+    e1 = HalfEdge(v1, face=None, prev=e0, nxt=None, twin=None)
+    e2 = HalfEdge(v2, face=None, prev=e1, nxt=e0, twin=None)
+    e0.prev, e0.next = e2, e1
+    e1.next = e2
+    return e0, e1, e2
+
+
+def init_edges_faces(simplex):
+    """ Initialization function
+
+    Args:
+        simplex (list): init. tetrahedron vertices list.
+    Returns:
+        list[HalfEdges]: list of edges.
+        list[Face]: list of faces.
+    """
+    v0, v1, v2, v3 = simplex
+    edges = []
+    faces = []
+    e012 = triangle2edges(v0, v1, v3)
+    faces.append(Face(e012[0]))
+    edges += e012
+    
+    e012 = triangle2edges(v1, v2, v3)
+    faces.append(Face(e012[0]))
+    edges += e012
+
+    e012 = triangle2edges(v2, v0, v3)
+    faces.append(Face(e012[0]))
+    edges += e012
+
+    e012 = triangle2edges(v2, v1, v0)
+    faces.append(Face(e012[0]))
+    edges += e012
+
+    return edges, faces
+
+
+def faces2mesh(faces, clr=(1, 0.3, 0), radius=0.01, viz=False):
+    """ faces list to mesh
+
+    Args:
+        faces (list[Face]): list of Faces.
+        clr (tuple/list): color of mesh. Defaults to (1, 0.3, 0).
+        radius (float): radius of edges). Defaults to 0.01.
+        viz (bool): do visualize. Defaults to False.
+    Returns:
+        o3d.geometry.TriangleMesh: mesh
+    """
+    mesh = None
+    for face in faces:
+        vertices, edges, _ = face.to_mesh(normal=False)
+        if mesh is None:
+            mesh = LineMesh(vertices, edges, colors=clr, radius=radius).cylinder_set
+        else:
+            mesh += LineMesh(vertices, edges, colors=clr, radius=radius).cylinder_set
+    if viz:
+        o3d.visualization.draw_geometries([mesh, ])
+    return mesh
+
+
 def quickhull(points):
     """ Function to find 3D convex hull.
 
@@ -111,8 +181,12 @@ def quickhull(points):
     if nondegenerate:
         tetra = LineMesh(simplex, [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], colors=[1, 0, 0], radius=0.01).cylinder_set
 
+        edges, faces = init_edges_faces(simplex)
+        tetramesh = faces2mesh(faces, clr=(1, 0.3, 0), radius=0.01, viz=True)
+        exit()
         # Assign outside points to faces
         v0, v1, v2, v3 = simplex
+    
         faces = [Polygon(v2, v1, v0, ), Polygon(v0, v1, v3), Polygon(v1, v2, v3), Polygon(v2, v0, v3), ]
         
         vertices = np.array([face.vertices[0] for face in faces])
@@ -138,6 +212,42 @@ def quickhull(points):
             # # Visualization
             # pcd = to_pcd(faces[i].points, [1, 0.5, 0], viz=False, )
             # o3d.visualization.draw_geometries([pcd, tetra])
+
+
+
+
+
+
+
+
+
+
+        faces = [Polygon(v2, v1, v0, ), Polygon(v0, v1, v3), Polygon(v1, v2, v3), Polygon(v2, v0, v3), ]
+        
+        vertices = np.array([face.vertices[0] for face in faces])
+        normals = np.array([face.normal for face in faces])
+
+        below, inside = points_above_planes(points, vertices, normals)
+        above, outside = np.logical_not(below), np.logical_not(inside)
+
+        indices = above&outside[:, None]
+        mask = np.logical_not(indices[:, 0])
+        nfaces = len(faces)
+        temp = []
+        print('total points, inside point, outside points:', points.shape[0], inside.sum(), outside.sum())
+        for i in range(nfaces):
+            faces[i].neighbours = [faces[nbr] for nbr in range(nfaces) if nbr != i]
+            above_pts = points[indices[:, i]]
+            faces[i].points = above_pts
+            if i < (nfaces - 1):
+                indices[:, i + 1] = indices[:, i + 1]&mask
+                mask = mask&np.logical_not(indices[:, i])
+            if len(above_pts):
+                temp.append(faces[i])
+            # # Visualization
+            # pcd = to_pcd(faces[i].points, [1, 0.5, 0], viz=False, )
+            # o3d.visualization.draw_geometries([pcd, tetra])
+
         faces = temp
         edges, edge_faces = edge_lookup(faces, edges=None, edge_faces=None)
 

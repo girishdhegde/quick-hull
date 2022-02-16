@@ -47,7 +47,20 @@ class HalfEdge:
         vertices = np.array([self.prev.tail, self.tail, self.next.tail])
         edges = np.array([[0, 1], [1, 2], [2, 0]]) + start
         face = np.array([0, 1, 2]) + start
-        return vertices, edges, faces
+        return vertices, edges, face 
+
+    def __str__(self, ):
+        info = f"""
+        HalfEdge(
+            tail={self.tail}, 
+            face={repr(self.face)}, 
+            prev={repr(self.prev)},
+            next={repr(self.next)},
+            twin={repr(self.twin)},
+            id={repr(self)},
+        )
+        """
+        return info
 
 
 class Face:
@@ -71,6 +84,10 @@ class Face:
         self.points = points
         self.visited = False
 
+        edge.face = self
+        edge.next.face = self
+        edge.prev.face = self
+        
     def distance(self, points):
         """ Function to calculate distance of points from plane
 
@@ -84,6 +101,27 @@ class Face:
         dp = np.dot(p_p0, self.normal)
         dist = np.abs(dp)
         return dp, dist
+    
+    def to_mesh(self, start=0, normal=False, ):
+        vertices, edges, face = self.edge.to_mesh(start)
+        if normal:
+            source = self.vertex
+            end = self.vertex + self.normal
+            vertices = np.vstack([vertices, [source, end]])
+            edges = np.vstack([edges, [start + 3, start + 4]])
+        return vertices, edges, face
+
+    def __str__(self, ):
+        info = f"""
+        Face(
+            vertex={self.vertex}, 
+            normal={self.normal}, 
+            edge={repr(self.edge)},
+            visited={self.visited},
+            id={repr(self)},
+        )
+        """
+        return info
 
 
 class Polygon:
