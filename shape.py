@@ -82,7 +82,9 @@ class Face:
             normal = normal/np.linalg.norm(normal)
         self.normal = normal
         self.points = points
+
         self.visited = False
+        self.visible = False
 
         edge.face = self
         edge.next.face = self
@@ -118,6 +120,7 @@ class Face:
             normal={self.normal}, 
             edge={repr(self.edge)},
             visited={self.visited},
+            visible={self.visibleisited},
             id={repr(self)},
         )
         """
