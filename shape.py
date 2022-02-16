@@ -1,5 +1,5 @@
 import numpy as np
-
+    
 
 __author__ = "__Girish_Hegde__"
 
@@ -26,6 +26,66 @@ def points_above_planes(points, vertices, normals, ):
     return sign, inside
 
 
+class HalfEdge:
+    def __init__(self, tail, face, prev=None, nxt=None, twin=None):
+        """ HalfEdge datastructure
+
+        Args:
+            tail (np.ndarray): [x, y, z] - start vertex.
+            face (Face): face.
+            prev (HalfEdge, optional): previous edge. Defaults to None.
+            nxt (HalfEdge, optional): next edge. Defaults to None.
+            twin (HalfEdge, optional): twin edge. Defaults to None.
+        """
+        self.tail = tail
+        self.face = face
+        self.prev = prev
+        self.next = nxt
+        self.twin = twin
+
+    def to_mesh(self, start=0):
+        vertices = np.array([self.prev.tail, self.tail, self.next.tail])
+        edges = np.array([[0, 1], [1, 2], [2, 0]]) + start
+        face = np.array([0, 1, 2]) + start
+        return vertices, edges, faces
+
+
+class Face:
+    def __init__(self, edge, normal=None, points=None):
+        """ Face datastructure
+
+        Args:
+            edge (HalfEdge): HalfEdge of face.
+            normal (np.ndarray, optional): [x_, y_, z_] - unit normal to the face.
+            points (np.ndarray, optional): points above the plane. 
+        """
+        self.edge = edge
+        self.vertex = edge.tail
+        if normal is None:
+            vertices, _, _ = edge.to_mesh()
+            v0v1 = vertices[1] - vertices[0]
+            v1v2 = vertices[2] - vertices[1]
+            normal = np.cross(v0v1, v1v2)
+            normal = normal/np.linalg.norm(normal)
+        self.normal = normal
+        self.points = points
+        self.visited = False
+
+    def distance(self, points):
+        """ Function to calculate distance of points from plane
+
+        Args:
+            points (np.ndarray): [N, 3] - array of xyz points.
+        Returns:
+            (np.ndarray) - [N, ] dot products(signed distances).
+            (np.ndarray) - [N, ] absolute disances.
+        """
+        p_p0 = points - self.vertex
+        dp = np.dot(p_p0, self.normal)
+        dist = np.abs(dp)
+        return dp, dist
+
+
 class Polygon:
     def __init__(self, *vertices, normal=None, edges=None):
         """ Polygon
@@ -50,6 +110,11 @@ class Polygon:
         self.edge_vectors = []
         for (start, end) in self.edges:
             self.edge_vectors.append(self.vertices[end] - self.vertices[start])
+
+        # QuickHull related variables
+        self.neighbours = []
+        self.on_hull = True
+        self.visible = False
     
     def distance(self, points):
         """ Function to calculate distance of points from plane
@@ -147,44 +212,3 @@ def ray_x_plane(origin, direction, vertex, normal):
         t = ((vertex - origin).dot(normal))/denom
         return origin + t*direction
     return None
-
-
-# def inside(vertex, normal, points):
-#     """ Function to check if points inside polygon
-
-#     Args:
-#         vertex ([type]): [description]
-#         normal ([type]): [description]
-#         points ([type]): [description]
-
-#     Returns:
-#         [type]: [description]
-#     """
-#     for i in range(len(v)-1):
-#         edge = v[i+1] - v[i]
-#         c = p - v[i]
-#         if N.dot(edge.cross(c)) < 0:
-#             return None
-#     edge = v[0] - v[-1]
-#     c = p - v[-1]
-#     if N.dot(edge.cross(c)) < 0:
-#         return None
-#     return p
-
-
-# def _rayTriX(self, obj):
-#     p, _ = self._rayPlaneX(obj.plane)
-#     if p is None:
-#         return None, None
-#     # inside - outside
-#     p = insideOutside(p, obj.norm, obj.v0, obj.v1, obj.v2)
-
-#     if p is None:
-#         return None, None
-    
-#     # check if triangle is behind the ray
-#     toP = p - self.source
-#     if toP.dot(self.direction) < 0:
-#         return None, None
-
-#     return p, obj.norm     

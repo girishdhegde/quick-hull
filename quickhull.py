@@ -64,6 +64,40 @@ def maximal_simplex(points):
     return tetrahedron, True
 
 
+def eie(edge, edges):
+    """ Function to check if edge in edges
+
+    Args:
+        edge (np.ndarray): [2, ] - edge
+        edges (np.ndarray): [N, 2] - edges
+    """
+    dif = (edges - edge[None, :]).sum(axis=0)
+    if dif.any():
+        return np.where(dif)[0]
+    dif = (edges - edge[None, [1, 0]]).sum(axis=0)
+    if dif.any():
+        return np.where(dif)[0]
+    return None
+
+
+def edge_lookup(faces, edges=None, edge_faces=None):
+    edge_faces = [] if edge_faces is None else edge_faces
+    for face in faces:
+        for (s, e) in face.edges:
+            ed = np.array([face.vertices[s], face.vertices[e]])
+            if edges is None:
+                edges = np.array([ed])
+                edge_faces.append([face, ])
+            else:
+                idx = eie(ed, edges)
+                if idx is None:
+                    edges = np.append(edges, ed)
+                    edge_faces.append([face, ])
+                else:
+                    edge_faces[idx].append(face)
+    return edges, edge_faces
+
+
 def quickhull(points):
     """ Function to find 3D convex hull.
 
@@ -105,22 +139,25 @@ def quickhull(points):
             # pcd = to_pcd(faces[i].points, [1, 0.5, 0], viz=False, )
             # o3d.visualization.draw_geometries([pcd, tetra])
         faces = temp
+        edges, edge_faces = edge_lookup(faces, edges=None, edge_faces=None)
 
         while faces:
             # Find most distant point to face
             face = faces.pop()
-            if not len(face.points): continue
+            if (not len(face.points)) or (not face.on_hull): continue
             dp, distances = face.distance(face.points)
             farthest_idx = np.argmax(distances)
             farthest = face.points[farthest_idx]
 
             # Find all faces that can be seen from that point
             light_faces = [face]
+            face.on_hull = False
             for nbr in face.neighbours:
-                edge, uc_vtx = face.common_edge(nbr)
+                # edge, uc_vtx = face.common_edge(nbr)
                 dp, dist = nbr.distance(farthest)
                 if dp > 0:
                     light_faces.append(nbr)
+                    nbr.on_hull = False
 
 
 
