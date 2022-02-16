@@ -64,38 +64,29 @@ def maximal_simplex(points):
     return tetrahedron, True
 
 
-def eie(edge, edges):
-    """ Function to check if edge in edges
+def classify(points, faces):
+    """ Function to assign points
+        face.points.append(pt) if pt above(pt, face).
 
     Args:
-        edge (np.ndarray): [2, ] - edge
-        edges (np.ndarray): [N, 2] - edges
+        points (np.ndarray): [N, 3] - points.
+        faces (list[Face]): list of faces.
     """
-    dif = (edges - edge[None, :]).sum(axis=0)
-    if dif.any():
-        return np.where(dif)[0]
-    dif = (edges - edge[None, [1, 0]]).sum(axis=0)
-    if dif.any():
-        return np.where(dif)[0]
-    return None
+    vertices = np.array([face.vertex for face in faces])
+    normals = np.array([face.normal for face in faces])
 
+    below, inside = points_above_planes(points, vertices, normals)
+    above, outside = np.logical_not(below), np.logical_not(inside)
 
-def edge_lookup(faces, edges=None, edge_faces=None):
-    edge_faces = [] if edge_faces is None else edge_faces
-    for face in faces:
-        for (s, e) in face.edges:
-            ed = np.array([face.vertices[s], face.vertices[e]])
-            if edges is None:
-                edges = np.array([ed])
-                edge_faces.append([face, ])
-            else:
-                idx = eie(ed, edges)
-                if idx is None:
-                    edges = np.append(edges, ed)
-                    edge_faces.append([face, ])
-                else:
-                    edge_faces[idx].append(face)
-    return edges, edge_faces
+    indices = above&outside[:, None]
+    mask = np.logical_not(indices[:, 0])
+    nfaces = len(faces)
+    for i in range(nfaces):
+        above_pts = points[indices[:, i]]
+        faces[i].points = above_pts
+        if i < (nfaces - 1):
+            indices[:, i + 1] = indices[:, i + 1]&mask
+            mask = mask&np.logical_not(indices[:, i])
 
 
 def triangle2edges(v0, v1, v2):
@@ -111,7 +102,34 @@ def triangle2edges(v0, v1, v2):
     e2 = HalfEdge(v2, face=None, prev=e1, nxt=e0, twin=None)
     e0.prev, e0.next = e2, e1
     e1.next = e2
-    return e0, e1, e2
+    return [e0, e1, e2]
+
+
+def insert_edge(edge,  edges=None):
+    """ Function update edge list.
+
+    Args:
+        edge (HalfEdge/list[HalfEdge]): edge/edges to be inserted.
+        edges (list[HalfEdge], optional): edge list. Defaults to None.
+
+    Returns:
+        list[HalfEdges]: updated list of edges. 
+    """
+    edges = [] if edges is None else edges 
+    edge_list = [edge] if isinstance(edge, (HalfEdge)) else edge
+    
+    for edge in edge_list:
+        tail = edge.tail
+        tip = edge.next.tail
+        # Find twin if exists
+        for other in edges:
+            if (other.tail == tip).all():
+                if (other.next.tail == tail).all():
+                    other.twin = edge
+                    edge.twin =  other
+                    break
+        edges.append(edge)
+    return edges
 
 
 def init_edges_faces(simplex):
@@ -124,23 +142,23 @@ def init_edges_faces(simplex):
         list[Face]: list of faces.
     """
     v0, v1, v2, v3 = simplex
-    edges = []
+    edges = None
     faces = []
     e012 = triangle2edges(v0, v1, v3)
     faces.append(Face(e012[0]))
-    edges += e012
+    edges = insert_edge(e012, edges)
     
     e012 = triangle2edges(v1, v2, v3)
     faces.append(Face(e012[0]))
-    edges += e012
+    edges = insert_edge(e012, edges)
 
     e012 = triangle2edges(v2, v0, v3)
     faces.append(Face(e012[0]))
-    edges += e012
+    edges = insert_edge(e012, edges)
 
     e012 = triangle2edges(v2, v1, v0)
     faces.append(Face(e012[0]))
-    edges += e012
+    edges = insert_edge(e012, edges)
 
     return edges, faces
 
@@ -178,139 +196,82 @@ def quickhull(points):
         (np.ndarray, np.ndarray): [M, 3] - polyhedron vertices, [L, 3] - faces
     """
     simplex, nondegenerate = maximal_simplex(points)
-    if nondegenerate:
-        tetra = LineMesh(simplex, [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], colors=[1, 0, 0], radius=0.01).cylinder_set
+    if not nondegenerate:
+        print('Error: points form Degenerate simplex')
+        return None
 
-        edges, faces = init_edges_faces(simplex)
-        tetramesh = faces2mesh(faces, clr=(1, 0.3, 0), radius=0.01, viz=True)
-        exit()
-        # Assign outside points to faces
-        v0, v1, v2, v3 = simplex
+    edges, faces = init_edges_faces(simplex)
+    tetra = faces2mesh(faces, clr=(1, 0.3, 0), radius=0.01, viz=True)
     
-        faces = [Polygon(v2, v1, v0, ), Polygon(v0, v1, v3), Polygon(v1, v2, v3), Polygon(v2, v0, v3), ]
-        
-        vertices = np.array([face.vertices[0] for face in faces])
-        normals = np.array([face.normal for face in faces])
+    classify(points, faces)
+    # # Visualization
+    # for face in faces:
+    #     pcd = to_pcd(face.points, [0, 0, 1], viz=False, )
+    #     o3d.visualization.draw_geometries([pcd, tetra])
 
-        below, inside = points_above_planes(points, vertices, normals)
-        above, outside = np.logical_not(below), np.logical_not(inside)
-
-        indices = above&outside[:, None]
-        mask = np.logical_not(indices[:, 0])
-        nfaces = len(faces)
-        temp = []
-        print('total points, inside point, outside points:', points.shape[0], inside.sum(), outside.sum())
-        for i in range(nfaces):
-            faces[i].neighbours = [faces[nbr] for nbr in range(nfaces) if nbr != i]
-            above_pts = points[indices[:, i]]
-            faces[i].points = above_pts
-            if i < (nfaces - 1):
-                indices[:, i + 1] = indices[:, i + 1]&mask
-                mask = mask&np.logical_not(indices[:, i])
-            if len(above_pts):
-                temp.append(faces[i])
-            # # Visualization
-            # pcd = to_pcd(faces[i].points, [1, 0.5, 0], viz=False, )
-            # o3d.visualization.draw_geometries([pcd, tetra])
+    exit()
 
 
+    while faces:
+        # Find most distant point to face
+        face = faces.pop()
+        if (not len(face.points)) or (not face.on_hull): continue
+        dp, distances = face.distance(face.points)
+        farthest_idx = np.argmax(distances)
+        farthest = face.points[farthest_idx]
 
+        # Find all faces that can be seen from that point
+        light_faces = [face]
+        face.on_hull = False
+        for nbr in face.neighbours:
+            # edge, uc_vtx = face.common_edge(nbr)
+            dp, dist = nbr.distance(farthest)
+            if dp > 0:
+                light_faces.append(nbr)
+                nbr.on_hull = False
 
 
 
 
 
 
-
-        faces = [Polygon(v2, v1, v0, ), Polygon(v0, v1, v3), Polygon(v1, v2, v3), Polygon(v2, v0, v3), ]
-        
-        vertices = np.array([face.vertices[0] for face in faces])
-        normals = np.array([face.normal for face in faces])
-
-        below, inside = points_above_planes(points, vertices, normals)
-        above, outside = np.logical_not(below), np.logical_not(inside)
-
-        indices = above&outside[:, None]
-        mask = np.logical_not(indices[:, 0])
-        nfaces = len(faces)
-        temp = []
-        print('total points, inside point, outside points:', points.shape[0], inside.sum(), outside.sum())
-        for i in range(nfaces):
-            faces[i].neighbours = [faces[nbr] for nbr in range(nfaces) if nbr != i]
-            above_pts = points[indices[:, i]]
-            faces[i].points = above_pts
-            if i < (nfaces - 1):
-                indices[:, i + 1] = indices[:, i + 1]&mask
-                mask = mask&np.logical_not(indices[:, i])
-            if len(above_pts):
-                temp.append(faces[i])
-            # # Visualization
-            # pcd = to_pcd(faces[i].points, [1, 0.5, 0], viz=False, )
-            # o3d.visualization.draw_geometries([pcd, tetra])
-
-        faces = temp
-        edges, edge_faces = edge_lookup(faces, edges=None, edge_faces=None)
-
-        while faces:
-            # Find most distant point to face
-            face = faces.pop()
-            if (not len(face.points)) or (not face.on_hull): continue
-            dp, distances = face.distance(face.points)
-            farthest_idx = np.argmax(distances)
-            farthest = face.points[farthest_idx]
-
-            # Find all faces that can be seen from that point
-            light_faces = [face]
-            face.on_hull = False
-            for nbr in face.neighbours:
-                # edge, uc_vtx = face.common_edge(nbr)
-                dp, dist = nbr.distance(farthest)
-                if dp > 0:
-                    light_faces.append(nbr)
-                    nbr.on_hull = False
+    # direction = uc_vtx - farthest
+    # direction = direction / np.linalg.norm(direction)
+    # x = face.intersect(farthest, direction)
+    # if x is None:  # if visible
+    #     light_faces.append(nbr)
+    # #     xpt = fpt
+    # else:
+    #     xpt = to_pcd([x], [0, 0, 0], viz=False, )
+    # Visualization
+    # upt = to_pcd([uc_vtx], [0, 0, 1], viz=False, )
+    # o3d.visualization.draw_geometries([fpt, upt, xpt, tri])
+# print('light faces:', light_faces)
+# if len(light_faces) > 1:
+#     print("Sorry this case not handled")
+#     fpt = to_pcd([farthest], [1, 0.5, 0], viz=False, )
+#     tetra = LineMesh(simplex, [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], colors=[1, 0, 0], radius=0.01).cylinder_set
+#     o3d.visualization.draw_geometries([fpt, tetra])
 
 
 
-
-
-
-        # direction = uc_vtx - farthest
-        # direction = direction / np.linalg.norm(direction)
-        # x = face.intersect(farthest, direction)
-        # if x is None:  # if visible
-        #     light_faces.append(nbr)
-        # #     xpt = fpt
-        # else:
-        #     xpt = to_pcd([x], [0, 0, 0], viz=False, )
-        # Visualization
-        # upt = to_pcd([uc_vtx], [0, 0, 1], viz=False, )
-        # o3d.visualization.draw_geometries([fpt, upt, xpt, tri])
-    # print('light faces:', light_faces)
-    # if len(light_faces) > 1:
-    #     print("Sorry this case not handled")
-    #     fpt = to_pcd([farthest], [1, 0.5, 0], viz=False, )
-    #     tetra = LineMesh(simplex, [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]], colors=[1, 0, 0], radius=0.01).cylinder_set
-    #     o3d.visualization.draw_geometries([fpt, tetra])
-
-
-
-        # # Points visualization
-        # inside_pcd = to_pcd(points[inside], [1, 0.5, 0], viz=False, )
-        # outside_pcd = to_pcd(points[np.logical_not(inside)], [0, 0, 1], viz=False, )
-        # pcd = inside_pcd + outside_pcd
-        # # pcd = inside_pcd
-        # # Normals visualization
-        # npoints = [] 
-        # nedges = []
-        # for i, face in enumerate(faces):
-        #     normal_start = face.vertices[0]
-        #     normal_end = normal_start + face.normal
-        #     npoints.append(normal_start)
-        #     npoints.append(normal_end)
-        #     nedges.append([2*i, 2*i + 1])
-        # nmesh = LineMesh(npoints, nedges, colors=[0, 1, 0], radius=0.01).cylinder_set
-        
-        # o3d.visualization.draw_geometries([pcd, tetra, nmesh])
+    # # Points visualization
+    # inside_pcd = to_pcd(points[inside], [1, 0.5, 0], viz=False, )
+    # outside_pcd = to_pcd(points[np.logical_not(inside)], [0, 0, 1], viz=False, )
+    # pcd = inside_pcd + outside_pcd
+    # # pcd = inside_pcd
+    # # Normals visualization
+    # npoints = [] 
+    # nedges = []
+    # for i, face in enumerate(faces):
+    #     normal_start = face.vertices[0]
+    #     normal_end = normal_start + face.normal
+    #     npoints.append(normal_start)
+    #     npoints.append(normal_end)
+    #     nedges.append([2*i, 2*i + 1])
+    # nmesh = LineMesh(npoints, nedges, colors=[0, 1, 0], radius=0.01).cylinder_set
+    
+    # o3d.visualization.draw_geometries([pcd, tetra, nmesh])
 
 
 if __name__ == '__main__':
